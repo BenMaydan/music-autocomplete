@@ -448,9 +448,11 @@ def get_config_hash(config: argparse.Namespace) -> str:
         'dropout': config.dropout,
         'learning_rate': config.learning_rate,
         'batch_size': config.batch_size,
+        'optimizer_type': config.optimizer_type,
         'weight_decay': config.weight_decay,
         'adam_beta1': config.adam_beta1,
         'adam_beta2': config.adam_beta2,
+        'momentum': config.momentum,
         'scheduler': config.scheduler,
         'min_learning_rate': config.min_learning_rate,
         'lr_step_size': config.lr_step_size,
@@ -473,14 +475,26 @@ def get_optimizer(model, config):
     params = model.parameters()
     
     # You could implement weight decay exclusion for bias/LayerNorm here
-    # For simplicity, we use AdamW on all parameters
     
-    optimizer = torch.optim.AdamW(
-        params,
-        lr=config.learning_rate,
-        weight_decay=config.weight_decay,
-        betas=(config.adam_beta1, config.adam_beta2)
-    )
+    if config.optimizer_type == 'adamw':
+        print("Using AdamW optimizer")
+        optimizer = torch.optim.AdamW(
+            params,
+            lr=config.learning_rate,
+            weight_decay=config.weight_decay,
+            betas=(config.adam_beta1, config.adam_beta2)
+        )
+    elif config.optimizer_type == 'sgd':
+        print("Using SGD optimizer")
+        optimizer = torch.optim.SGD(
+            params,
+            lr=config.learning_rate,
+            momentum=config.momentum,
+            weight_decay=config.weight_decay
+        )
+    else:
+        raise ValueError(f"Unknown optimizer type: {config.optimizer_type}")
+        
     return optimizer
 
 def get_scheduler(optimizer, config, total_steps):
@@ -503,6 +517,11 @@ def get_scheduler(optimizer, config, total_steps):
             mode='min',
             factor=config.lr_gamma,
             patience=config.lr_patience
+        )
+    elif config.scheduler == 'exponential':
+        scheduler = torch.optim.lr_scheduler.ExponentialLR(
+            optimizer,
+            gamma=config.lr_gamma
         )
     elif config.scheduler == 'none':
         scheduler = None
@@ -532,22 +551,24 @@ def main():
     parser.add_argument('--learning_rate', type=float, default=3e-4, help="Peak learning rate.")
     parser.add_argument('--max_epochs', type=int, default=10, help="Number of training epochs.")
     parser.add_argument('--batch_size', type=int, default=64, help="Batch size.")
-    parser.add_argument('--weight_decay', type=float, default=0.01, help="AdamW weight decay.")
+    parser.add_argument('--optimizer_type', type=str, default='adamw', choices=['adamw', 'sgd'], help="Optimizer type.")
+    parser.add_argument('--weight_decay', type=float, default=0.01, help="Weight decay (AdamW) or L2 penalty (SGD).")
     parser.add_argument('--adam_beta1', type=float, default=0.9, help="Adam optimizer beta1.")
     parser.add_argument('--adam_beta2', type=float, default=0.95, help="Adam optimizer beta2.")
+    parser.add_argument('--momentum', type=float, default=0.9, help="Momentum for SGD optimizer.")
     parser.add_argument('--grad_clip', type=float, default=1.0, help="Gradient clipping value (0 for no clipping).")
 
     # --- Scheduler ---
-    parser.add_argument('--scheduler', type=str, default='cosine', choices=['cosine', 'step', 'plateau', 'none'], help="LR scheduler type.")
+    parser.add_argument('--scheduler', type=str, default='cosine', choices=['cosine', 'step', 'plateau', 'exponential', 'none'], help="LR scheduler type.")
     parser.add_argument('--min_learning_rate', type=float, default=3e-5, help="Minimum LR for cosine scheduler.")
     parser.add_argument('--lr_step_size', type=int, default=10, help="Step size for 'step' scheduler.")
-    parser.add_argument('--lr_gamma', type=float, default=0.1, help="LR decay factor for 'step' or 'plateau' schedulers.")
+    parser.add_argument('--lr_gamma', type=float, default=0.1, help="LR decay factor for 'step', 'plateau', or 'exponential' schedulers.")
     parser.add_argument('--lr_patience', type=int, default=3, help="Patience for 'plateau' scheduler.")
 
-    # --- Checkpointing ---
-    # Changed default to 'trained_models/model.pt'
+    # --- Checkpointing & Run Naming ---
     parser.add_argument('--checkpoint_path', type=str, default='trained_models/model.pt', help="Path to save/load checkpoints. Base directory will be 'trained_models'.")
     parser.add_argument('--load_checkpoint', action='store_true', help="Flag to load a checkpoint if it exists.")
+    parser.add_argument('--run_name', type=str, default=None, help="A custom name for the run directory. If None, a hash is used.")
 
     config = parser.parse_args()
 
@@ -556,13 +577,16 @@ def main():
 
     # Create unique run hash and checkpoint directory
     run_hash = get_config_hash(config)
-    print(f"Run hash: {run_hash}")
+    
+    # Use custom run_name if provided, otherwise fall back to hash
+    run_dir_name = config.run_name if config.run_name else run_hash
+    print(f"Run name: {run_dir_name}")
     
     # Update checkpoint_path to be unique per run
-    # e.g., 'trained_models/model.pt' -> 'trained_models/<hash>/model.pt'
+    # e.g., 'trained_models/model.pt' -> 'trained_models/<run_dir_name>/model.pt'
     base_dir = os.path.dirname(config.checkpoint_path) # e.g., 'trained_models'
     filename = os.path.basename(config.checkpoint_path) # e.g., 'model.pt'
-    config.checkpoint_path = os.path.join(base_dir, run_hash, filename)
+    config.checkpoint_path = os.path.join(base_dir, run_dir_name, filename)
     # the Trainer class will create this directory
 
     train_loader, val_loader = get_dataloaders(config)
