@@ -7,6 +7,8 @@ This script includes:
 1.  The model definition (`DecoderOnlyTransformer`).
 2.  A `Trainer` class to handle training, validation, and checkpointing.
 3.  Command-line argument parsing with `argparse` for hyperparameters.
+4.  Automatic run directory creation (`trained_models/<run_hash>`) for
+    ablation studies, saving config.json, checkpoints, and loss_curves.png.
 
 Example usage:
 $ python gpt_model_trainer.py --vocab_size=1024 --n_blocks=8 --n_embed=512 --n_head=8 --batch_size=64 --max_epochs=10 --learning_rate=3e-4 --scheduler='cosine'
@@ -24,6 +26,7 @@ import torch
 import torch.nn as nn
 from torch.nn import functional as F
 from dataloader import get_dataloaders
+import matplotlib.pyplot as plt
 
 # --- 1. Model Definition ---
 
@@ -240,10 +243,20 @@ class Trainer:
             self.device = 'cpu'
             
         self.model.to(self.device)
+        
+        # Run-specific directory for checkpoints, config, and plots
+        self.run_dir = os.path.dirname(self.config.checkpoint_path)
+        os.makedirs(self.run_dir, exist_ok=True)
+        
         self.start_epoch = 0
         self.best_val_loss = float('inf')
+        
+        # History for plotting
+        self.train_loss_history = []
+        self.val_loss_history = []
 
         print(f"Trainer initialized. Running on device: {self.device}")
+        print(f"Run artifacts will be saved to: {self.run_dir}")
 
     def _run_epoch(self, split: str) -> float:
         """Run a single epoch of training or validation."""
@@ -284,15 +297,49 @@ class Trainer:
         avg_loss = total_loss / num_batches
         return avg_loss
 
+    def _plot_loss_curves(self):
+        """Plots and saves the training and validation loss curves."""
+        if not self.train_loss_history and not self.val_loss_history:
+            print("No loss history to plot.")
+            return
+
+        epochs_ran = len(self.train_loss_history)
+        if epochs_ran == 0:
+            print("No epochs were run, skipping plot.")
+            return
+            
+        epoch_axis = range(self.start_epoch, self.start_epoch + epochs_ran)
+        
+        plt.figure(figsize=(12, 6))
+        
+        # Plot train loss
+        plt.plot(epoch_axis, self.train_loss_history, 'b-', label='Train Loss')
+        # Plot validation loss
+        plt.plot(epoch_axis, self.val_loss_history, '-', color='orange', label='Validation Loss')
+        
+        # Add red dots for checkpoints (saved every epoch)
+        plt.plot(epoch_axis, self.train_loss_history, 'ro', markersize=4, label='Checkpoint (Epoch)')
+        plt.plot(epoch_axis, self.val_loss_history, 'ro', markersize=4, label='_nolegend_') # Avoid duplicate legend
+        
+        plt.title('Training & Validation Loss')
+        plt.xlabel('Epoch')
+        plt.ylabel('Loss')
+        plt.legend()
+        plt.grid(True)
+        
+        save_path = os.path.join(self.run_dir, 'loss_curves.png')
+        try:
+            plt.savefig(save_path)
+            print(f"Saved loss curves to {save_path}")
+        except Exception as e:
+            print(f"Error saving loss curves: {e}")
+        plt.close()
+
+
     def save_checkpoint(self, epoch: int, is_best: bool):
         """Save a checkpoint."""
         if not self.config.checkpoint_path:
             return
-
-        # Ensure checkpoint directory exists
-        chkpt_dir = os.path.dirname(self.config.checkpoint_path)
-        if not os.path.exists(chkpt_dir) and chkpt_dir != '':
-            os.makedirs(chkpt_dir, exist_ok=True)
             
         state = {
             'epoch': epoch,
@@ -303,11 +350,11 @@ class Trainer:
             'config': self.config,
         }
         
-        # Save last checkpoint
+        # Save last checkpoint (e.g., trained_models/<hash>/model.pt)
         torch.save(state, self.config.checkpoint_path)
         print(f"Saved checkpoint to {self.config.checkpoint_path}")
 
-        # Save best checkpoint
+        # Save best checkpoint (e.g., trained_models/<hash>/model_best.pt)
         if is_best:
             best_path = self.config.checkpoint_path.replace('.pt', '_best.pt')
             torch.save(state, best_path)
@@ -338,6 +385,18 @@ class Trainer:
 
     def train(self):
         """Run the full training loop."""
+        
+        # Save config.json to the run directory
+        config_path = os.path.join(self.run_dir, 'config.json')
+        try:
+            with open(config_path, 'w') as f:
+                # Convert namespace to dict for json serialization
+                json.dump(vars(self.config), f, indent=4)
+            print(f"Saved config to {config_path}")
+        except Exception as e:
+            print(f"Error saving config.json: {e}")
+
+        # Load checkpoint if requested
         self.load_checkpoint()
 
         for epoch in range(self.start_epoch, self.config.max_epochs):
@@ -345,6 +404,10 @@ class Trainer:
             
             train_loss = self._run_epoch('train')
             val_loss = self._run_epoch('val')
+            
+            # Store loss history
+            self.train_loss_history.append(train_loss)
+            self.val_loss_history.append(val_loss)
             
             if self.scheduler:
                 # Scheduler step can be based on val_loss or epoch
@@ -365,6 +428,9 @@ class Trainer:
             self.save_checkpoint(epoch, is_best)
             
         print(f"Training finished. Best validation loss: {self.best_val_loss:.4f}")
+        
+        # Plot and save loss curves
+        self._plot_loss_curves()
 
 
 # --- 4. Main Function ---
@@ -478,7 +544,8 @@ def main():
     parser.add_argument('--lr_patience', type=int, default=3, help="Patience for 'plateau' scheduler.")
 
     # --- Checkpointing ---
-    parser.add_argument('--checkpoint_path', type=str, default='checkpoints/model.pt', help="Path to save/load checkpoints.")
+    # Changed default to 'trained_models/model.pt'
+    parser.add_argument('--checkpoint_path', type=str, default='trained_models/model.pt', help="Path to save/load checkpoints. Base directory will be 'trained_models'.")
     parser.add_argument('--load_checkpoint', action='store_true', help="Flag to load a checkpoint if it exists.")
 
     config = parser.parse_args()
@@ -490,14 +557,13 @@ def main():
     run_hash = get_config_hash(config)
     print(f"Run hash: {run_hash}")
     
-    # Update checkpoint_path to be unique
-    # The default 'checkpoints/model.pt' will be modified
-    base_dir = os.path.dirname(config.checkpoint_path) # e.g., 'checkpoints'
+    # Update checkpoint_path to be unique per run
+    # e.g., 'trained_models/model.pt' -> 'trained_models/<hash>/model.pt'
+    base_dir = os.path.dirname(config.checkpoint_path) # e.g., 'trained_models'
     filename = os.path.basename(config.checkpoint_path) # e.g., 'model.pt'
     config.checkpoint_path = os.path.join(base_dir, run_hash, filename)
-    print(f"Checkpoints will be saved to: {os.path.dirname(config.checkpoint_path)}")
+    # the Trainer class will create this directory
 
-    # 1. Get Dataloaders (Now uses imported function)
     train_loader, val_loader = get_dataloaders(config)
     
     # Calculate total steps for cosine scheduler
