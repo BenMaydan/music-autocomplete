@@ -520,7 +520,7 @@ def main():
     parser.add_argument('--val_split', type=float, default=0.1, help="Percentage of songs to use for validation: (0, 1)")
 
     # --- Model Hyperparameters ---
-    parser.add_argument('--vocab_size', type=int, required=True, help="Vocabulary size.")
+    parser.add_argument('--vocab_size', type=int, default=5000, help="Vocabulary size.")
     parser.add_argument('--block_size', type=int, default=1024, help="Max sequence length (context window).")
     parser.add_argument('--n_embed', type=int, default=512, help="Embedding dimension.")
     parser.add_argument('--n_blocks', type=int, default=8, help="Number of Transformer blocks.")
