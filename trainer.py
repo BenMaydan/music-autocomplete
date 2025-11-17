@@ -18,6 +18,7 @@ import argparse
 import math
 import os
 import time
+import tqdm
 from typing import Optional, Tuple
 import json
 import hashlib
@@ -271,7 +272,7 @@ class Trainer:
         num_batches = 0
         
         pbar = enumerate(loader)
-        for it, (x, y) in pbar:
+        for it, (x, y) in tqdm.tqdm(pbar):
             x, y = x.to(self.device), y.to(self.device)
             
             with torch.set_grad_enabled(is_train):
@@ -352,7 +353,7 @@ class Trainer:
         
         # Save last checkpoint (e.g., trained_models/<hash>/model.pt)
         torch.save(state, self.config.checkpoint_path)
-        print(f"Saved checkpoint to {self.config.checkpoint_path}")
+        print(f"Saved checkpoint #{epoch} to {self.config.checkpoint_path}")
 
         # Save best checkpoint (e.g., trained_models/<hash>/model_best.pt)
         if is_best:
@@ -399,7 +400,7 @@ class Trainer:
         # Load checkpoint if requested
         self.load_checkpoint()
 
-        for epoch in range(self.start_epoch, self.config.max_epochs):
+        for epoch in tqdm.tqdm(range(self.start_epoch, self.config.max_epochs)):
             epoch_start_time = time.time()
             
             train_loss = self._run_epoch('train')
