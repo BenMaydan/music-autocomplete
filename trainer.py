@@ -575,7 +575,15 @@ def main():
     config = parser.parse_args()
 
     # --- Setup ---
-    torch.manual_seed(42)
+    torch.manual_seed(783)
+
+    # Set matmul precision for better performance on new GPUs
+    if torch.cuda.is_available():
+        try:
+            torch.set_float32_matmul_precision('high')
+            print("Set torch.set_float32_matmul_precision('high')")
+        except Exception as e:
+            print(f"Could not set matmul precision: {e}")
 
     # Create unique run hash and checkpoint directory
     run_hash = get_config_hash(config)
