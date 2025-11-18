@@ -604,6 +604,8 @@ def main():
     # Calculate total steps for cosine scheduler
     total_steps = len(train_loader) * config.max_epochs
 
+    print(f"Train batches: {len(train_loader)}, Val batches: {len(val_loader) if val_loader else 0}")
+
     # 2. Initialize Model
     model = DecoderOnlyTransformer(
         vocab_size=config.vocab_size,
