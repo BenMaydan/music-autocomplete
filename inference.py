@@ -225,7 +225,7 @@ def run_inference(config: argparse.Namespace):
         return
 
     print(f"Loading weights from {checkpoint_file}...")
-    checkpoint = torch.load(checkpoint_file, map_location=device)
+    checkpoint = torch.load(checkpoint_file, map_location=device, weights_only=False)
     model.load_state_dict(checkpoint['model_state_dict'])
     model.to(device)
 
