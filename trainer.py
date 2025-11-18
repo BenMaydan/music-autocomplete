@@ -569,6 +569,8 @@ def main():
     parser.add_argument('--checkpoint_path', type=str, default='trained_models/model.pt', help="Path to save/load checkpoints. Base directory will be 'trained_models'.")
     parser.add_argument('--load_checkpoint', action='store_true', help="Flag to load a checkpoint if it exists.")
     parser.add_argument('--run_name', type=str, default=None, help="A custom name for the run directory. If None, a hash is used.")
+    
+    parser.add_argument("--compile", action="store_true", help="Use torch.compile() to optimize the model (requires PyTorch 2.0+)")
 
     config = parser.parse_args()
 
@@ -603,6 +605,17 @@ def main():
         block_size=config.block_size,
         dropout=config.dropout
     )
+
+    if config.compile:
+        if hasattr(torch, 'compile'):
+            print("Compiling the model... (this may take a moment)")
+            try:
+                model = torch.compile(model)
+                print("Model compiled successfully.")
+            except Exception as e:
+                print(f"Model compilation failed: {e}. Running un-compiled.")
+        else:
+            print("torch.compile not found. Running un-compiled. (Requires PyTorch 2.0+)")
 
     # 3. Initialize Optimizer and Scheduler
     optimizer = get_optimizer(model, config)
