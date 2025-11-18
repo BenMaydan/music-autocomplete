@@ -155,6 +155,8 @@ def get_dataloaders(config):
     random.shuffle(all_json_paths)
 
     # Select the subset
+    if NUM_SONGS_TO_USE == 0:
+        NUM_SONGS_TO_USE = len(all_json_paths)
     if NUM_SONGS_TO_USE > len(all_json_paths):
         print(f"Warning: You asked for {NUM_SONGS_TO_USE} songs, but only {len(all_json_paths)} were found.")
         NUM_SONGS_TO_USE = len(all_json_paths)
