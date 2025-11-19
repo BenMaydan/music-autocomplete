@@ -1,5 +1,4 @@
 /lmd_*
 .DS_STORE
 /trained_models
-/inference
 .pyc

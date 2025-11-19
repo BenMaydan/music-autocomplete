@@ -17,7 +17,7 @@ def fix_checkpoint(checkpoint_path, backup=True):
     # 1. Load the checkpoint
     # map_location='cpu' ensures we can load it even if we don't have the same GPU setup active
     try:
-        checkpoint = torch.load(checkpoint_path, map_location='cpu')
+        checkpoint = torch.load(checkpoint_path, map_location='cpu', weights_only=False)
     except Exception as e:
         print(f"Failed to load checkpoint: {e}")
         return
