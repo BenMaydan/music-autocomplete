@@ -1,4 +1,4 @@
 /lmd_*
 .DS_STORE
-/trained_models
 .pyc
+.__pycache__

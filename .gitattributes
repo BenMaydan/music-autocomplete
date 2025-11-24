@@ -1,3 +1,7 @@
+inference/* filter=lfs diff=lfs merge=lfs -text
+lmd_matched/* filter=lfs diff=lfs merge=lfs -text
+lmd_matched_processed/* filter=lfs diff=lfs merge=lfs -text
+trained_models/* filter=lfs diff=lfs merge=lfs -text
 trained_models filter=lfs diff=lfs merge=lfs -text
 trained_models/**/*.pt filter=lfs diff=lfs merge=lfs -text
 trained_models/**/*.pt.bak filter=lfs diff=lfs merge=lfs -text

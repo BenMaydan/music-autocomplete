@@ -281,13 +281,6 @@ def run_inference(config: argparse.Namespace):
         tokenizer_path=config.tokenizer_file,
         output_path=output_path
     )
-    
-    # 8. Attempt to convert MIDI to MP3 if soundfont is provided
-    if config.soundfont_path:
-        convert_midi_to_mp3(output_path, config.soundfont_path)
-    else:
-        print("\n[INFO] Skipping MP3 conversion. To enable, provide a SoundFont")
-        print("       using the --soundfont_path /path/to/font.sf2 argument.")
 
 # --- 5. Argparse Setup ---
 
@@ -297,11 +290,8 @@ if __name__ == "__main__":
     parser.add_argument('--run_dir', type=str, required=True, help="Path to the training run directory (e.g., 'trained_models/abcdef1234').")
     parser.add_argument('--prompt_tokens', type=str, required=True, help="Initial sequence of tokens (comma-separated integers, e.g., '10,20,30').")
     parser.add_argument('--max_new_tokens', type=int, default=512, help="Number of new tokens to generate.")
-    parser.add_argument('--temperature', type=float, default=0.8, help="Softmax temperature for sampling.")
+    parser.add_argument('--temperature', type=float, default=1.2, help="Softmax temperature for sampling.")
     parser.add_argument('--top_k', type=int, default=50, help="Sample from the top K most likely tokens.")
-    
-    # --- Audio Synthesis ---
-    parser.add_argument('--soundfont_path', type=str, default=None, help="Path to a .sf2 SoundFont file for MIDI-to-MP3 synthesis.")
     
     # Un-suppress the tokenizer_file argument
     parser.add_argument('--tokenizer_file', type=str, default="lmd_matched_tokenizer.json", help="Path to the trained miditok tokenizer JSON file.")
