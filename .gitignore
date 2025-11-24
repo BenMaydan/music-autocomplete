@@ -1,4 +1,4 @@
 /lmd_*
-.DS_STORE
-.pyc
+*.DS_STORE
+*.pyc
 .__pycache__
