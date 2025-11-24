@@ -1,4 +1,5 @@
 /lmd_*
 *.DS_STORE
 *.pyc
+*.zip
 .__pycache__
