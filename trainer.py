@@ -573,7 +573,12 @@ def main():
     parser.add_argument("--compile", action="store_true", help="Use torch.compile() to optimize the model (requires PyTorch 2.0+)")
 
     config = parser.parse_args()
+    train_model(config)
 
+def train_model(config: argparse.Namespace):
+    """
+    Main training logic, separated for easier ablation studies.
+    """
     # --- Setup ---
     torch.manual_seed(783)
 
@@ -642,6 +647,8 @@ def main():
     )
     
     trainer.train()
+    
+    return trainer.train_loss_history, trainer.val_loss_history
 
 
 if __name__ == "__main__":
