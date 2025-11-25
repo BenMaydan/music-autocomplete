@@ -96,7 +96,7 @@ def run_ablation_study(study_name: str):
     num_permutations = len(permutations)
 
     print(f"--- Ablation Study: {study_name} ---")
-    print(f"Parameters to vary: {list(ablation_ranges.keys())} (plus dynamic batch_size)")
+    print(f"Parameters to vary: {list(ablation_ranges.keys())}")
     print(f"Total permutations to run: {num_permutations}")
     
     if num_permutations == 0:
@@ -117,62 +117,84 @@ def run_ablation_study(study_name: str):
     os.makedirs(study_dir, exist_ok=True)
     print(f"\nCreated study directory: {study_dir}")
 
-    for i, config_dict in enumerate(permutations):
-        print(f"\n--- Running Permutation {i+1}/{num_permutations} ---")
-        print(f"Params: {config_dict['_ablation_params']}")
+    try:
+        for i, config_dict in enumerate(permutations):
+            print(f"\n--- Running Permutation {i+1}/{num_permutations} ---")
+            print(f"Params: {config_dict['_ablation_params']}")
 
-        # Create a descriptive run name
-        # e.g., run_1_lr_0.001_bs_32
-        run_name = "_".join([f"{k}_{v}" for k, v in config_dict['_ablation_params'].items()])
-        
-        # Sanitize run name for filesystem
-        run_name = run_name.replace(".", "p").replace("/", "_")
-        
-        # Update config for this run
-        # We need to convert the dict back to a Namespace for the trainer
-        # But first, let's set the run_name and checkpoint_path correctly
-        
-        # The trainer expects checkpoint_path to be the full path to the model file.
-        # It then derives the run directory from that.
-        # We want: trained_models/<study_name>/<run_name>/model.pt
-        
-        # FIX: Trainer automatically appends run_name to the directory of checkpoint_path
-        # if run_name is provided. So we should NOT include run_name in the base dir here.
-        # We want the base dir to be just the study dir.
-        checkpoint_path = os.path.join(study_dir, "model.pt")
-        
-        config_dict['run_name'] = run_name # This is used for logging/display
-        config_dict['checkpoint_path'] = checkpoint_path
-        
-        # Remove our internal metadata before creating Namespace
-        ablation_params = config_dict.pop('_ablation_params')
-        
-        # Create Namespace
-        config_namespace = argparse.Namespace(**config_dict)
-        
-        # Run training
-        try:
-            train_loss, val_loss = trainer.train_model(config_namespace)
+            # Create a descriptive run name
+            # e.g., lr_0.001_bs_32
+            run_name = "_".join([f"{k}_{v}" for k, v in config_dict['_ablation_params'].items()])
             
-            # Save loss history to a JSON file in the run directory
-            # The trainer already creates the directory and saves config.json and plots
-            # But we ensure it exists just in case (and for tests where trainer is mocked)
+            # Sanitize run name for filesystem
+            run_name = run_name.replace(".", "p").replace("/", "_")
+            
+            # Check if this run is already completed
             full_run_dir = os.path.join(study_dir, run_name)
-            os.makedirs(full_run_dir, exist_ok=True)
             history_path = os.path.join(full_run_dir, "loss_history.json")
-            with open(history_path, 'w') as f:
-                json.dump({
-                    'train_loss': train_loss,
-                    'val_loss': val_loss,
-                    'ablation_params': ablation_params
-                }, f, indent=4)
-            print(f"Saved loss history to {history_path}")
             
-        except Exception as e:
-            print(f"Error running permutation {i+1}: {e}")
-            # Decide whether to continue or stop. For now, let's continue.
-            continue
+            if os.path.exists(history_path):
+                print(f"Run {run_name} already completed. Skipping.")
+                continue
 
+            # Update config for this run
+            # We need to convert the dict back to a Namespace for the trainer
+            # But first, let's set the run_name and checkpoint_path correctly
+            
+            # The trainer expects checkpoint_path to be the full path to the model file.
+            # It then derives the run directory from that.
+            # We want: trained_models/<study_name>/<run_name>/model.pt
+            
+            # FIX: Trainer automatically appends run_name to the directory of checkpoint_path
+            # if run_name is provided. So we should NOT include run_name in the base dir here.
+            # We want the base dir to be just the study dir.
+            checkpoint_path = os.path.join(study_dir, "model.pt")
+            
+            config_dict['run_name'] = run_name # This is used for logging/display
+            config_dict['checkpoint_path'] = checkpoint_path
+            
+            # Check for existing checkpoint to resume
+            # The actual checkpoint file will be at trained_models/<study_name>/<run_name>/model.pt
+            # because the trainer constructs the path using run_name.
+            actual_checkpoint_path = os.path.join(full_run_dir, "model.pt")
+            if os.path.exists(actual_checkpoint_path):
+                print(f"Found existing checkpoint at {actual_checkpoint_path}. Resuming training.")
+                config_dict['load_checkpoint'] = True
+            else:
+                config_dict['load_checkpoint'] = False
+            
+            # Remove our internal metadata before creating Namespace
+            ablation_params = config_dict.pop('_ablation_params')
+            
+            # Create Namespace
+            config_namespace = argparse.Namespace(**config_dict)
+            
+            # Run training
+            try:
+                train_loss, val_loss = trainer.train_model(config_namespace)
+                
+                # Save loss history to a JSON file in the run directory
+                # The trainer already creates the directory and saves config.json and plots
+                # But we ensure it exists just in case (and for tests where trainer is mocked)
+                os.makedirs(full_run_dir, exist_ok=True)
+                with open(history_path, 'w') as f:
+                    json.dump({
+                        'train_loss': train_loss,
+                        'val_loss': val_loss,
+                        'ablation_params': ablation_params
+                    }, f, indent=4)
+                print(f"Saved loss history to {history_path}")
+                
+            except Exception as e:
+                print(f"Error running permutation {i+1}: {e}")
+                # Decide whether to continue or stop. For now, let's continue.
+                continue
+                
+    except KeyboardInterrupt:
+        print("\n\nAblation study interrupted by user.")
+        print("You can resume this study later by running the same command.")
+        sys.exit(0)
+        
     print(f"\n--- Ablation Study {study_name} Completed ---")
 
 if __name__ == "__main__":
