@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Study: {{ study_name }}</h2>
+
+    <div style="margin-bottom: 20px;">
+        <label for="x_param">X-Axis Parameter:</label>
+        <select id="x_param">
+            {% for param in params %}
+            <option value="{{ param }}">{{ param }}</option>
+            {% endfor %}
+        </select>
+
+        <label for="y_param">Y-Axis Parameter:</label>
+        <select id="y_param">
+            {% for param in params %}
+            <option value="{{ param }}" {% if loop.index==2 %}selected{% endif %}>{{ param }}</option>
+            {% endfor %}
+        </select>
+
+        <button onclick="updatePlot()">Update Plot</button>
+    </div>
+
+    <div id="plot-container" style="text-align: center;">
+        <p>Select parameters and click "Update Plot" to view results.</p>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function updatePlot() {
+        const xParam = document.getElementById('x_param').value;
+        const yParam = document.getElementById('y_param').value;
+        const container = document.getElementById('plot-container');
+
+        container.innerHTML = '<p>Loading plot...</p>';
+
+        const img = new Image();
+        img.src = `/ablation/{{ study_name }}/plot?x_param=${xParam}&y_param=${yParam}`;
+        img.style.maxWidth = '100%';
+        img.style.borderRadius = '8px';
+
+        img.onload = function () {
+            container.innerHTML = '';
+            container.appendChild(img);
+        };
+
+        img.onerror = function () {
+            container.innerHTML = '<p style="color: var(--error);">Error loading plot. Check if data exists for these parameters.</p>';
+        };
+    }
+
+    // Initial load if params exist
+    if (document.getElementById('x_param').options.length > 0) {
+        updatePlot();
+    }
+</script>
+{% endblock %}

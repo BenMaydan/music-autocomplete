@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block head %}
+<script
+    src="https://cdn.jsdelivr.net/combine/npm/tone@14.7.58,npm/@magenta/music@1.23.1/es6/core.js,npm/html-midi-player@1.5.0"></script>
+{% endblock %}
+
+{% block content %}
+<div class="card">
+    <h2>Run Inference</h2>
+
+    <div style="display: flex; gap: 20px; flex-wrap: wrap;">
+        <div style="flex: 1; min-width: 300px;">
+            <div style="margin-bottom: 15px;">
+                <label for="model_path" style="display: block; margin-bottom: 5px;">Select Model:</label>
+                <select id="model_path" style="width: 100%;">
+                    {% for model in models %}
+                    <option value="{{ model }}">{{ model }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label for="prompt" style="display: block; margin-bottom: 5px;">Prompt (MIDI Tokens,
+                    comma-separated):</label>
+                <input type="text" id="prompt" value="60,62,64" style="width: 100%; box-sizing: border-box;">
+                <small style="color: #888;">Example: 60,62,64 (C Major Chord)</small>
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label for="max_new_tokens" style="display: block; margin-bottom: 5px;">Max New Tokens:</label>
+                <input type="number" id="max_new_tokens" value="256" min="1" max="1024" style="width: 100px;">
+            </div>
+
+            <div style="margin-bottom: 15px;">
+                <label for="temperature" style="display: block; margin-bottom: 5px;">Temperature:</label>
+                <input type="number" id="temperature" value="1.0" step="0.1" min="0.1" max="2.0" style="width: 100px;">
+            </div>
+
+            <button onclick="generateMusic()" id="generateBtn">Generate Music</button>
+            <div id="loading" class="loading">Generating... This may take a while on CPU.</div>
+        </div>
+
+        <div
+            style="flex: 1; min-width: 300px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #252525; border-radius: 8px; padding: 20px;">
+            <h3>Result</h3>
+
+            <midi-player id="player" src="" sound-font visualizer="#myVisualizer">
+            </midi-player>
+
+            <midi-visualizer type="piano-roll" id="myVisualizer"></midi-visualizer>
+
+            <div id="download-link" style="margin-top: 20px; display: none;">
+                <a href="#" target="_blank" style="color: var(--secondary);">Download MIDI</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    async function generateMusic() {
+        const modelPath = document.getElementById('model_path').value;
+        const prompt = document.getElementById('prompt').value;
+        const maxNewTokens = document.getElementById('max_new_tokens').value;
+        const temperature = document.getElementById('temperature').value;
+
+        const btn = document.getElementById('generateBtn');
+        const loading = document.getElementById('loading');
+        const player = document.getElementById('player');
+        const downloadLink = document.getElementById('download-link');
+
+        btn.disabled = true;
+        loading.style.display = 'block';
+        downloadLink.style.display = 'none';
+
+        try {
+            const response = await fetch('/inference/generate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    model_path: modelPath,
+                    prompt: prompt,
+                    max_new_tokens: maxNewTokens,
+                    temperature: temperature
+                })
+            });
+
+            const data = await response.json();
+
+            if (data.success) {
+                player.src = data.file_url;
+
+                const a = downloadLink.querySelector('a');
+                a.href = data.file_url;
+                downloadLink.style.display = 'block';
+            } else {
+                alert('Error: ' + data.error);
+            }
+
+        } catch (e) {
+            alert('Error generating music: ' + e);
+        } finally {
+            btn.disabled = false;
+            loading.style.display = 'none';
+        }
+    }
+</script>
+{% endblock %}

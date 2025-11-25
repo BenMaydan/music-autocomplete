@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="card">
+    <h2>Ablation Studies</h2>
+    {% if studies %}
+    <ul style="list-style: none; padding: 0;">
+        {% for study in studies %}
+        <li style="margin-bottom: 10px;">
+            <a href="/ablation/{{ study }}"
+                style="display: block; padding: 15px; background-color: #2c2c2c; border-radius: 4px; text-decoration: none; color: white; transition: background 0.3s;">
+                {{ study }}
+            </a>
+        </li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No ablation studies found in <code>trained_models/</code>.</p>
+    {% endif %}
+</div>
+{% endblock %}

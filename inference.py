@@ -57,12 +57,9 @@ def save_tokens_as_midi(token_ids: np.ndarray, tokenizer_path: str, output_path:
         tokenizer = miditok.REMI(params=Path(tokenizer_path))
 
     except FileNotFoundError:
-        print(f"[ERROR] Tokenizer file not found at: {tokenizer_path}")
-        return
+        raise FileNotFoundError(f"Tokenizer file not found at: {tokenizer_path}")
     except Exception as e:
-        print(f"[ERROR] Failed to load tokenizer from file: {e}")
-        print("         Ensure this is a valid tokenizer JSON file saved with miditok V2's .save() method.")
-        return
+        raise RuntimeError(f"Failed to load tokenizer from file: {e}. Ensure this is a valid tokenizer JSON file saved with miditok V2's .save() method.")
 
     # 2. Ensure token_ids is a 1D list of standard Python integers
     if token_ids.ndim > 1:
@@ -75,22 +72,18 @@ def save_tokens_as_midi(token_ids: np.ndarray, tokenizer_path: str, output_path:
         midi_object = tokenizer([token_ids_list])
         
     except IndexError as e:
-        print(f"[ERROR] A generated token ID is out of the tokenizer's vocabulary range: {e}")
-        print("This may happen if the wrong vocab_size was used during training or inference.")
-        return
+        raise ValueError(f"A generated token ID is out of the tokenizer's vocabulary range: {e}. This may happen if the wrong vocab_size was used during training or inference.")
     except Exception as e:
-        print(f"[ERROR] Failed during token ID to MIDI conversion: {e}")
-        print("The generated sequence may be malformed or incompatible with the tokenizer.")
-        return
+        raise RuntimeError(f"Failed during token ID to MIDI conversion: {e}. The generated sequence may be malformed or incompatible with the tokenizer.")
 
     # 4. Save the MIDI file
     try:
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         # .dump() is the method for MidiFile objects
         midi_object.dump_midi(output_path)
-        print(f"\n[SUCCESS] Saved generated MIDI file to: {output_path}")
+        print(f"\\n[SUCCESS] Saved generated MIDI file to: {output_path}")
     except Exception as e:
-        print(f"[ERROR] Failed to save MIDI file: {e}")
+        raise RuntimeError(f"Failed to save MIDI file: {e}")
 
 
 # --- 3. MIDI to MP3 Converter ---
@@ -163,7 +156,7 @@ def convert_midi_to_mp3(midi_path: str, soundfont_path: str):
     except subprocess.CalledProcessError as e:
         print(f"[ERROR] Failed during audio conversion. Return code: {e.returncode}")
         if e.stderr:
-            print(f"         Error output:\n{e.stderr.decode('utf-8')}")
+            print(f"         Error output:\\n{e.stderr.decode('utf-8')}")
     except Exception as e:
         print(f"[ERROR] An unexpected error occurred during conversion: {e}")
     finally:
@@ -183,8 +176,7 @@ def run_inference(config: argparse.Namespace):
 
     # 1. Load Configuration
     if not os.path.exists(config_file):
-        print(f"[ERROR] Configuration file not found: {config_file}")
-        return
+        raise FileNotFoundError(f"Configuration file not found: {config_file}")
         
     with open(config_file, 'r') as f:
         config_data = json.load(f)
@@ -196,14 +188,11 @@ def run_inference(config: argparse.Namespace):
     
     # Ensure mandatory config for model are present
     if not all(hasattr(config, k) for k in ['vocab_size', 'n_embed', 'n_head', 'n_blocks', 'block_size', 'dropout']):
-        print("[ERROR] Missing essential model configuration parameters.")
-        return
+        raise ValueError("Missing essential model configuration parameters.")
 
     # 1.a. Check for tokenizer file
     if not os.path.exists(config.tokenizer_file):
-        print(f"[ERROR] Tokenizer file not found at path: {config.tokenizer_file}")
-        print("Please provide the correct path via --tokenizer_file")
-        return
+        raise FileNotFoundError(f"Tokenizer file not found at path: {config.tokenizer_file}. Please provide the correct path via --tokenizer_file")
 
     # 2. Setup Device
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
@@ -221,8 +210,16 @@ def run_inference(config: argparse.Namespace):
     
     # 4. Load Checkpoint Weights
     if not os.path.exists(checkpoint_file):
-        print(f"[ERROR] Checkpoint file not found: {checkpoint_file}")
-        return
+        raise FileNotFoundError(f"Checkpoint file not found: {checkpoint_file}")
+
+    # Check if the file is a Git LFS pointer
+    try:
+        with open(checkpoint_file, 'rb') as f:
+            header = f.read(100)
+            if header.startswith(b"version https://git-lfs"):
+                raise RuntimeError(f"The model file at {checkpoint_file} appears to be a Git LFS pointer, not the actual binary. Please run 'git lfs pull' to download the actual model weights.")
+    except Exception as e:
+        print(f"[WARNING] Could not check file header: {e}")
 
     print(f"Loading weights from {checkpoint_file}...")
     checkpoint = torch.load(checkpoint_file, map_location=device, weights_only=False)
@@ -234,15 +231,13 @@ def run_inference(config: argparse.Namespace):
         # Assuming prompt is a comma-separated list of token indices (integers)
         prompt_tokens_list = [int(t.strip()) for t in config.prompt_tokens.split(',')]
         if not prompt_tokens_list:
-             print("[ERROR] Prompt tokens list is empty after parsing.")
-             return
+             raise ValueError("Prompt tokens list is empty after parsing.")
     except ValueError:
-        print("[ERROR] Invalid prompt tokens. Ensure they are comma-separated integers (e.g., '10,20,30').")
-        return
+        raise ValueError("Invalid prompt tokens. Ensure they are comma-separated integers (e.g., '10,20,30').")
         
     # Convert to tensor: (1, seq_len)
     prompt_tensor = torch.tensor([prompt_tokens_list], dtype=torch.long, device=device)
-    print(f"\n[INFO] Input prompt size: {prompt_tensor.size(1)} tokens.")
+    print(f"\\n[INFO] Input prompt size: {prompt_tensor.size(1)} tokens.")
 
     # 6. Generate Sequence
     print(f"[INFO] Generating {config.max_new_tokens} new tokens...")
@@ -281,6 +276,11 @@ def run_inference(config: argparse.Namespace):
         tokenizer_path=config.tokenizer_file,
         output_path=output_path
     )
+    
+    return output_path
+
+# Alias for API usage
+run_inference_api = run_inference
 
 # --- 5. Argparse Setup ---
 

@@ -45,13 +45,14 @@ def load_study_data(study_dir: str, x_param: str, y_param: str) -> List[Dict[str
             
     return runs_data
 
-def plot_grid(runs_data: List[Dict[str, Any]], x_param: str, y_param: str, study_dir: str):
+def create_grid_figure(runs_data: List[Dict[str, Any]], x_param: str, y_param: str):
     """
-    Plots the grid of loss curves.
+    Creates the grid figure of loss curves.
+    Returns the matplotlib figure object.
     """
     if not runs_data:
         print("No matching runs found.")
-        return
+        return None
 
     # Extract unique values for x and y axes
     x_values = sorted(list(set(d['params'][x_param] for d in runs_data)))
@@ -60,9 +61,9 @@ def plot_grid(runs_data: List[Dict[str, Any]], x_param: str, y_param: str, study
     n_cols = len(x_values)
     n_rows = len(y_values)
     
-    print(f"Grid size: {n_rows} rows x {n_cols} columns")
-    print(f"X-axis ({x_param}): {x_values}")
-    print(f"Y-axis ({y_param}): {y_values}")
+    # print(f"Grid size: {n_rows} rows x {n_cols} columns")
+    # print(f"X-axis ({x_param}): {x_values}")
+    # print(f"Y-axis ({y_param}): {y_values}")
 
     fig, axes = plt.subplots(n_rows, n_cols, figsize=(5 * n_cols, 4 * n_rows), squeeze=False)
     
@@ -87,8 +88,10 @@ def plot_grid(runs_data: List[Dict[str, Any]], x_param: str, y_param: str, study
                 label = f"Run" + (f" ({label_suffix})" if label_suffix else "")
                 
                 epochs = range(len(run['train_loss']))
-                ax.plot(epochs, run['train_loss'], label=f"{label} (Train)", linestyle='--')
-                ax.plot(epochs, run['val_loss'], label=f"{label} (Val)")
+                # Get the next color from the cycle
+                p = ax.plot(epochs, run['train_loss'], label=f"{label} (Train)", linestyle='-')
+                color = p[0].get_color()
+                ax.plot(epochs, run['val_loss'], label=f"{label} (Val)", linestyle='--', color=color)
                 
             ax.set_title(f"{x_param}={x_val}, {y_param}={y_val}")
             ax.set_xlabel("Epoch")
@@ -98,11 +101,20 @@ def plot_grid(runs_data: List[Dict[str, Any]], x_param: str, y_param: str, study
                 ax.legend(fontsize='small')
 
     plt.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust for suptitle
-    
+    return fig
+
+def plot_grid(runs_data: List[Dict[str, Any]], x_param: str, y_param: str, study_dir: str):
+    """
+    Plots and saves the grid of loss curves.
+    """
+    fig = create_grid_figure(runs_data, x_param, y_param)
+    if fig is None:
+        return
+
     output_path = os.path.join(study_dir, f"grid_plot_{x_param}_{y_param}.png")
-    plt.savefig(output_path)
+    fig.savefig(output_path)
     print(f"Saved plot to {output_path}")
-    plt.close()
+    plt.close(fig)
 
 def main():
     parser = argparse.ArgumentParser(description="Plot ablation study results in a 2D grid.")
