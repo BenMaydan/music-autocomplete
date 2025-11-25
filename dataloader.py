@@ -127,7 +127,7 @@ def get_dataloaders(config):
 
     if not TOKENIZER_FILE.exists():
         print(f"Error: Tokenizer file not found at {TOKENIZER_FILE}")
-        exit()
+        sys.exit()
 
     tokenizer = REMI(params=TOKENIZER_FILE)
 
@@ -137,7 +137,7 @@ def get_dataloaders(config):
 
     if not all_json_paths:
         print(f"Error: No .json files found in {TOKENIZED_DIR}.")
-        exit()
+        sys.exit()
 
     # --- Robustness check for low song count ---
     if NUM_SONGS_TO_USE in [-1, 0]:
