@@ -74,6 +74,7 @@ print(f"Output directory: {TOKENIZED_DIR}")
 # Find all MIDI files for tokenization
 # We need to pass a sequence (like a list) to the tokenizer, not a generator.
 print("\nFinding all MIDI files for final tokenization...")
+print(LMD_FULL_DIR)
 all_midi_paths_for_tokenization = list(LMD_FULL_DIR.rglob("*.mid"))
 print(f"Found {len(all_midi_paths_for_tokenization)} files to tokenize.")
 
