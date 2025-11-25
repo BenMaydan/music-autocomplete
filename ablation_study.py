@@ -27,7 +27,7 @@ def get_default_config():
         'n_head': 8,
         'dropout': 0.1,
         'learning_rate': 3e-4,
-        'max_epochs': 10,
+        'max_epochs': 100,
         'batch_size': 64,
         'optimizer_type': 'adamw',
         'weight_decay': 0.01,
@@ -96,7 +96,7 @@ def run_ablation_study(study_name: str):
     num_permutations = len(permutations)
 
     print(f"--- Ablation Study: {study_name} ---")
-    print(f"Parameters to vary: {list(ablation_ranges.keys())}")
+    print(f"Parameters to vary: {list(ablation_ranges.keys())} (plus dynamic batch_size)")
     print(f"Total permutations to run: {num_permutations}")
     
     if num_permutations == 0:
@@ -123,8 +123,7 @@ def run_ablation_study(study_name: str):
 
         # Create a descriptive run name
         # e.g., run_1_lr_0.001_bs_32
-        param_str = "_".join([f"{k}_{v}" for k, v in config_dict['_ablation_params'].items()])
-        run_name = f"run_{i+1}_{param_str}"
+        run_name = "_".join([f"{k}_{v}" for k, v in config_dict['_ablation_params'].items()])
         
         # Sanitize run name for filesystem
         run_name = run_name.replace(".", "p").replace("/", "_")
@@ -137,8 +136,10 @@ def run_ablation_study(study_name: str):
         # It then derives the run directory from that.
         # We want: trained_models/<study_name>/<run_name>/model.pt
         
-        full_run_dir = os.path.join(study_dir, run_name)
-        checkpoint_path = os.path.join(full_run_dir, "model.pt")
+        # FIX: Trainer automatically appends run_name to the directory of checkpoint_path
+        # if run_name is provided. So we should NOT include run_name in the base dir here.
+        # We want the base dir to be just the study dir.
+        checkpoint_path = os.path.join(study_dir, "model.pt")
         
         config_dict['run_name'] = run_name # This is used for logging/display
         config_dict['checkpoint_path'] = checkpoint_path
@@ -156,6 +157,7 @@ def run_ablation_study(study_name: str):
             # Save loss history to a JSON file in the run directory
             # The trainer already creates the directory and saves config.json and plots
             # But we ensure it exists just in case (and for tests where trainer is mocked)
+            full_run_dir = os.path.join(study_dir, run_name)
             os.makedirs(full_run_dir, exist_ok=True)
             history_path = os.path.join(full_run_dir, "loss_history.json")
             with open(history_path, 'w') as f:
