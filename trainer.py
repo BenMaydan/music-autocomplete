@@ -259,7 +259,7 @@ class Trainer:
         print(f"Trainer initialized. Running on device: {self.device}")
         print(f"Run artifacts will be saved to: {self.run_dir}")
 
-    def _run_epoch(self, split: str) -> float:
+    def _run_epoch(self, split: str, epoch: int) -> float:
         """Run a single epoch of training or validation."""
         is_train = split == 'train'
         self.model.train(is_train)
@@ -272,7 +272,8 @@ class Trainer:
         num_batches = 0
         
         pbar = enumerate(loader)
-        for it, (x, y) in tqdm.tqdm(pbar):
+        desc = f"{split.capitalize()} Epoch {epoch}"
+        for it, (x, y) in tqdm.tqdm(pbar, desc=desc, leave=False):
             x, y = x.to(self.device), y.to(self.device)
             
             with torch.set_grad_enabled(is_train):
@@ -349,6 +350,8 @@ class Trainer:
             'scheduler_state_dict': self.scheduler.state_dict() if self.scheduler else None,
             'best_val_loss': self.best_val_loss,
             'config': self.config,
+            'train_loss_history': self.train_loss_history,
+            'val_loss_history': self.val_loss_history,
         }
         
         # Save last checkpoint (e.g., trained_models/<hash>/model.pt)
@@ -377,6 +380,8 @@ class Trainer:
                 
             self.start_epoch = checkpoint['epoch'] + 1
             self.best_val_loss = checkpoint['best_val_loss']
+            self.train_loss_history = checkpoint.get('train_loss_history', [])
+            self.val_loss_history = checkpoint.get('val_loss_history', [])
             
             print(f"Loaded checkpoint from {self.config.checkpoint_path}. Resuming from epoch {self.start_epoch}.")
         except Exception as e:
@@ -403,8 +408,8 @@ class Trainer:
         for epoch in tqdm.tqdm(range(self.start_epoch, self.config.max_epochs)):
             epoch_start_time = time.time()
             
-            train_loss = self._run_epoch('train')
-            val_loss = self._run_epoch('val')
+            train_loss = self._run_epoch('train', epoch)
+            val_loss = self._run_epoch('val', epoch)
             
             # Store loss history
             self.train_loss_history.append(train_loss)
@@ -420,7 +425,7 @@ class Trainer:
             epoch_duration = time.time() - epoch_start_time
             current_lr = self.optimizer.param_groups[0]['lr']
             
-            print(f"Epoch {epoch:03d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | LR: {current_lr:.6f} | Time: {epoch_duration:.2f}s")
+            tqdm.tqdm.write(f"Epoch {epoch:03d} | Train Loss: {train_loss:.4f} | Val Loss: {val_loss:.4f} | LR: {current_lr:.6f} | Time: {epoch_duration:.2f}s")
             
             is_best = val_loss < self.best_val_loss
             if is_best:
