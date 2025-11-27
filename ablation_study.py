@@ -49,19 +49,20 @@ def get_default_config():
 # --- Define Ablation Ranges Here ---
 
 # Phase 1: Architecture Search
-# Goal: Find the optimal model size and depth.
 ablation_ranges = {
     'n_embed': [128, 256, 512],
     'n_blocks': [2, 4, 8],
     'n_head': [2,4, 8]
-}
+} # the complexity ablation study, best performer is 512 embed, 8 blocks, 8 heads
 
-# Phase 2: Optimization Search (Uncomment when Phase 1 is done)
-# Goal: Tune training dynamics for the best architecture.
-# ablation_ranges = {
-#     'learning_rate': [1e-4, 3e-4, 5e-4],
-#     'optimizer_type': ['adamw', 'sgd']
-# }
+
+# Phase 2: Optimization Search
+ablation_ranges = {
+    'learning_rate': [1e-4, 3e-4, 6e-4],
+    'dropout': [0.1, 0.2],
+    'optimizer_type': ['adamw', 'sgd'],
+    'scheduler': ['cosine', 'linear'] 
+}
 
 def generate_permutations(base_config: Dict[str, Any], ranges: Dict[str, List[Any]]) -> List[Dict[str, Any]]:
     """

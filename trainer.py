@@ -528,6 +528,14 @@ def get_scheduler(optimizer, config, total_steps):
             optimizer,
             gamma=config.lr_gamma
         )
+    elif config.scheduler == 'linear':
+        end_factor = config.min_learning_rate / config.learning_rate
+        scheduler = torch.optim.lr_scheduler.LinearLR(
+            optimizer,
+            start_factor=1.0,
+            end_factor=end_factor,
+            total_iters=total_steps
+        )
     elif config.scheduler == 'none':
         scheduler = None
     else:

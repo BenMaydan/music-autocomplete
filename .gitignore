@@ -1,4 +1,5 @@
 /lmd_*
+/trained_models/**
 *.DS_STORE
 *.pyc
 *.zip
